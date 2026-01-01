@@ -1,0 +1,57 @@
+name: Build Android Library (Node 18 16kb-fix)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          ref: 'release18-20-4+16kb-fix' # Specifically target your branch
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r24
+          add-to-path: true
+
+      - name: Build Architectures
+        run: |
+          export ANDROID_NDK_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}
+          chmod +x ./android-configure
+
+          # 1. Build for ARM64
+          echo "--- Building for ARM64 ---"
+          ./android-configure $ANDROID_NDK_ROOT 24 arm64
+          make -j$(nproc)
+          mv out/Release/libnode.so out/Release/libnode_arm64.so
+
+          # Clean for next architecture
+          make clean
+
+          # 2. Build for ARM (32-bit)
+          echo "--- Building for ARM ---"
+          ./android-configure $ANDROID_NDK_ROOT 24 arm
+          make -j$(nproc)
+          mv out/Release/libnode.so out/Release/libnode_arm.so
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nodejs-mobile-v18-16kb-fix
+          path: |
+            out/Release/libnode_arm64.so
+            out/Release/libnode_arm.so
